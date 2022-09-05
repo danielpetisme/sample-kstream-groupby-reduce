@@ -19,7 +19,7 @@
         <mainClass.name>com.examples.danielpetisme.StreamsApp</mainClass.name>
         <kafka.version>3.2.0</kafka.version>
         <logback.version>1.2.3</logback.version>
-        <junit.version>4.13.2</junit.version>
+        <junit.version>5.8.1</junit.version>
         <assertj.version>3.19.0</assertj.version>
         <micrometer.version>1.8.2</micrometer.version>
         <testcontainers-kafka.version>1.16.2</testcontainers-kafka.version>
@@ -49,8 +49,8 @@
             <version>${vertx.version}</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>

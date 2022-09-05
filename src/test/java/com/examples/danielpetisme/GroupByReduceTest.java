@@ -1,5 +1,6 @@
 package com.examples.danielpetisme;
 
+import io.github.netmikey.logunit.api.LogCapturer;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -19,6 +20,7 @@ import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.test.TestRecord;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
@@ -39,6 +41,9 @@ import static org.assertj.core.api.Fail.fail;
 public class GroupByReduceTest {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(GroupByReduceTest.class);
+
+    @RegisterExtension
+    LogCapturer logCapturer = LogCapturer.create().captureForLogger(Logger.ROOT_LOGGER_NAME);
 
     static final String IputTopic1 = "in1";
     static final String OutputTopic = "out";
@@ -282,7 +287,6 @@ public class GroupByReduceTest {
     @Order(9)
     // Counting he windows open // closed
     public void runTestWithTopologyTestDriver_And_WithNoSuppress_And_ClosingEvent() throws Exception {
-
         // When events are generated within the session window, the window extends
         List<TestRecord<String, String>> inputWithEventInSessionWindow = List.of(
                 new TestRecord("1", "a", null, 1L),
@@ -381,6 +385,42 @@ public class GroupByReduceTest {
                     Collections.emptyMap()
             );
         }
+    }
+
+
+    @Test
+    @Order(10)
+    // Getting out of order events - skipping previous windows
+    public void runTestWithTopologyTestDriver_And_WithNoSuppress_And_No_Order() throws Exception {
+        // When events are generated within the session window, the window extends
+        List<TestRecord<String, String>> inputWithEventNotOrdered = List.of(
+                new TestRecord("1", "a", null, 25_000L),
+                new TestRecord("1", "a", null, 1L),
+                new TestRecord("1", "b", null, 2L),
+                new TestRecord("2", "a", null, 3L),
+                new TestRecord("1", "c", null, 4L)
+        );
+
+        List<TestRecord<String, String>> expectedWithEventNotOrdered = List.of(
+                new TestRecord("1-Window{startMs=25000, endMs=25000}", "a", null, 25_000L)
+        );
+
+        runTopologyTestDriver(createTopologyWithNoSuppressAndWindows(), inputWithEventNotOrdered, expectedWithEventNotOrdered);
+
+        try (KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka"))) {
+            kafka.start();
+            runTestContainer(
+                    kafka,
+                    createTopologyWithNoSuppressAndWindows(),
+                    inputWithEventNotOrdered, expectedWithEventNotOrdered,
+                    Collections.emptyMap()
+            );
+        }
+
+        logCapturer.assertContains("Skipping record for expired window. topic=[in1] partition=[0] offset=[1] timestamp=[1] window=[1,1] expiration=[19000] streamTime=[25000]");
+        logCapturer.assertContains("Skipping record for expired window. topic=[in1] partition=[0] offset=[2] timestamp=[2] window=[2,2] expiration=[19000] streamTime=[25000]");
+        logCapturer.assertContains("Skipping record for expired window. topic=[in1] partition=[0] offset=[3] timestamp=[3] window=[3,3] expiration=[19000] streamTime=[25000]");
+        logCapturer.assertContains("Skipping record for expired window. topic=[in1] partition=[0] offset=[4] timestamp=[4] window=[4,4] expiration=[19000] streamTime=[25000]");
     }
 
 
